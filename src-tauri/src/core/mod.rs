@@ -28,6 +28,10 @@ pub use self::profiles::*;
 pub use self::service::*;
 pub use self::verge::*;
 
+/// close the window for slient start
+/// after enhance mode
+static mut WINDOW_CLOSABLE: bool = true;
+
 #[derive(Clone)]
 pub struct Core {
   pub clash: Arc<Mutex<Clash>>,
@@ -382,7 +386,20 @@ impl Core {
       result.error.map(|err| log::error!("{err}"));
     });
 
-    window.emit("script-handler", payload).unwrap();
+    let verge = self.verge.lock();
+    let silent_start = verge.enable_silent_start.clone();
+
+    let closable = unsafe { WINDOW_CLOSABLE };
+
+    if silent_start.unwrap_or(false) && closable {
+      unsafe {
+        WINDOW_CLOSABLE = false;
+      }
+
+      window.emit("script-handler-close", payload).unwrap();
+    } else {
+      window.emit("script-handler", payload).unwrap();
+    }
 
     Ok(())
   }

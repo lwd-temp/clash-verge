@@ -9,11 +9,15 @@ pub fn resolve_setup(app: &App) {
   // init app config
   init::init_app(app.package_info());
 
-  // init states
-  let core = app.state::<Core>();
+  // init core
+  // should be initialized after init_app fix #122
+  let core = Core::new();
 
   core.set_win(app.get_window("main"));
   core.init(app.app_handle());
+
+  // fix #122
+  app.manage(core);
 
   resolve_window(app);
 }
@@ -84,6 +88,8 @@ pub fn create_window(app_handle: &AppHandle) {
   #[cfg(target_os = "windows")]
   {
     use crate::utils::winhelp;
+    use std::time::Duration;
+    use tokio::time::sleep;
     use window_shadows::set_shadow;
     use window_vibrancy::apply_blur;
 
@@ -97,7 +103,10 @@ pub fn create_window(app_handle: &AppHandle) {
         let app_handle = app_handle.clone();
 
         tauri::async_runtime::spawn(async move {
+          sleep(Duration::from_secs(1)).await;
+
           if let Some(window) = app_handle.get_window("main") {
+            let _ = window.show();
             let _ = set_shadow(&window, true);
 
             if !winhelp::is_win11() {
@@ -106,7 +115,7 @@ pub fn create_window(app_handle: &AppHandle) {
           }
         });
       }
-      Err(err) => log::error!("{err}"),
+      Err(err) => log::error!(target: "app", "{err}"),
     }
   }
 

@@ -4,6 +4,7 @@
 )]
 
 mod cmds;
+mod config;
 mod core;
 mod utils;
 
@@ -30,21 +31,32 @@ fn main() -> std::io::Result<()> {
 
   let tray_menu = SystemTrayMenu::new()
     .add_item(CustomMenuItem::new("open_window", "Show"))
+    .add_native_item(SystemTrayMenuItem::Separator)
+    .add_item(CustomMenuItem::new("rule_mode", "Rule Mode"))
+    .add_item(CustomMenuItem::new("global_mode", "Global Mode"))
+    .add_item(CustomMenuItem::new("direct_mode", "Direct Mode"))
+    .add_item(CustomMenuItem::new("script_mode", "Script Mode"))
+    .add_native_item(SystemTrayMenuItem::Separator)
     .add_item(CustomMenuItem::new("system_proxy", "System Proxy"))
     .add_item(CustomMenuItem::new("tun_mode", "Tun Mode"))
     .add_item(CustomMenuItem::new("restart_clash", "Restart Clash"))
+    .add_item(CustomMenuItem::new("restart_app", "Restart App"))
     .add_native_item(SystemTrayMenuItem::Separator)
     .add_item(CustomMenuItem::new("quit", "Quit").accelerator("CmdOrControl+Q"));
 
   #[allow(unused_mut)]
   let mut builder = tauri::Builder::default()
-    .manage(core::Core::new())
     .setup(|app| Ok(resolve::resolve_setup(app)))
     .system_tray(SystemTray::new().with_menu(tray_menu))
     .on_system_tray_event(move |app_handle, event| match event {
       SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
         "open_window" => {
           resolve::create_window(app_handle);
+        }
+        mode @ ("rule_mode" | "global_mode" | "direct_mode" | "script_mode") => {
+          let mode = &mode[0..mode.len() - 5];
+          let core = app_handle.state::<core::Core>();
+          crate::log_if_err!(core.update_mode(app_handle, mode));
         }
         "system_proxy" => {
           let core = app_handle.state::<core::Core>();
@@ -80,6 +92,9 @@ fn main() -> std::io::Result<()> {
           let core = app_handle.state::<core::Core>();
           crate::log_if_err!(core.restart_clash());
         }
+        "restart_app" => {
+          api::process::restart(&app_handle.env());
+        }
         "quit" => {
           resolve::resolve_reset(app_handle);
           app_handle.exit(0);
@@ -98,12 +113,17 @@ fn main() -> std::io::Result<()> {
       cmds::get_cur_proxy,
       cmds::open_app_dir,
       cmds::open_logs_dir,
+      cmds::open_web_url,
       cmds::kill_sidecar,
       cmds::restart_sidecar,
       // clash
       cmds::get_clash_info,
       cmds::patch_clash_config,
       cmds::change_clash_core,
+      cmds::get_runtime_config,
+      cmds::get_runtime_yaml,
+      cmds::get_runtime_exists,
+      cmds::get_runtime_logs,
       // verge
       cmds::get_verge_config,
       cmds::patch_verge_config,
@@ -146,8 +166,15 @@ fn main() -> std::io::Result<()> {
     builder = builder.menu(Menu::new().add_submenu(submenu_file));
   }
 
+  let mut context = tauri::generate_context!();
+  let verge = Verge::new();
+  for win in context.config_mut().tauri.windows.iter_mut() {
+    if verge.enable_silent_start.unwrap_or(false) {
+      win.visible = false;
+    }
+  }
   builder
-    .build(tauri::generate_context!())
+    .build(context)
     .expect("error while running tauri application")
     .run(|app_handle, e| match e {
       tauri::RunEvent::ExitRequested { api, .. } => {

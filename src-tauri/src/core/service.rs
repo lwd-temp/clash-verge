@@ -3,7 +3,6 @@ use crate::log_if_err;
 use crate::utils::{config, dirs};
 use anyhow::{bail, Result};
 use reqwest::header::HeaderMap;
-use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
 use std::{collections::HashMap, time::Duration};
 use tauri::api::process::{Command, CommandChild, CommandEvent};
@@ -54,12 +53,10 @@ impl Service {
         Ok(status) => {
           // 未启动clash
           if status.code != 0 {
-            if let Err(err) = Self::start_clash_by_service().await {
-              log::error!("{err}");
-            }
+            log_if_err!(Self::start_clash_by_service().await);
           }
         }
-        Err(err) => log::error!("{err}"),
+        Err(err) => log::error!(target: "app", "{err}"),
       }
     });
 
@@ -78,9 +75,7 @@ impl Service {
     }
 
     tauri::async_runtime::spawn(async move {
-      if let Err(err) = Self::stop_clash_by_service().await {
-        log::error!("{err}");
-      }
+      log_if_err!(Self::stop_clash_by_service().await);
     });
 
     Ok(())
@@ -110,8 +105,11 @@ impl Service {
     tauri::async_runtime::spawn(async move {
       while let Some(event) = rx.recv().await {
         match event {
-          CommandEvent::Stdout(line) => log::info!("[clash]: {}", line),
-          CommandEvent::Stderr(err) => log::error!("[clash]: {}", err),
+          CommandEvent::Stdout(line) => {
+            let stdout = if line.len() > 33 { &line[33..] } else { &line };
+            log::info!(target: "app" ,"[clash]: {}", stdout);
+          }
+          CommandEvent::Stderr(err) => log::error!(target: "app" ,"[clash error]: {}", err),
           _ => {}
         }
       }
@@ -138,20 +136,7 @@ impl Service {
     let temp_path = dirs::profiles_temp_path();
     config::save_yaml(temp_path.clone(), &config, Some("# Clash Verge Temp File"))?;
 
-    if info.server.is_none() {
-      bail!("failed to parse the server");
-    }
-
-    let server = info.server.unwrap();
-    let server = format!("http://{server}/configs");
-
-    let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", "application/json".parse().unwrap());
-
-    if let Some(secret) = info.secret.as_ref() {
-      let secret = format!("Bearer {}", secret.clone()).parse().unwrap();
-      headers.insert("Authorization", secret);
-    }
+    let (server, headers) = Self::clash_client_info(info)?;
 
     tauri::async_runtime::spawn(async move {
       let mut data = HashMap::new();
@@ -166,7 +151,7 @@ impl Service {
             match builder.send().await {
               Ok(resp) => {
                 if resp.status() != 204 {
-                  log::error!("failed to activate clash with status \"{}\"", resp.status());
+                  log::error!(target: "app", "failed to activate clash with status \"{}\"", resp.status());
                 }
 
                 notice.refresh_clash();
@@ -174,16 +159,63 @@ impl Service {
                 // do not retry
                 break;
               }
-              Err(err) => log::error!("failed to activate for `{err}`"),
+              Err(err) => log::error!(target: "app", "failed to activate for `{err}`"),
             }
           }
-          Err(err) => log::error!("failed to activate for `{err}`"),
+          Err(err) => log::error!(target: "app", "failed to activate for `{err}`"),
         }
         sleep(Duration::from_millis(500)).await;
       }
     });
 
     Ok(())
+  }
+
+  /// patch clash config
+  pub fn patch_config(&self, info: ClashInfo, config: Mapping, notice: Notice) -> Result<()> {
+    if !self.service_mode && self.sidecar.is_none() {
+      bail!("did not start sidecar");
+    }
+
+    let (server, headers) = Self::clash_client_info(info)?;
+
+    tauri::async_runtime::spawn(async move {
+      if let Ok(client) = reqwest::ClientBuilder::new().no_proxy().build() {
+        let builder = client.patch(&server).headers(headers.clone()).json(&config);
+
+        match builder.send().await {
+          Ok(_) => notice.refresh_clash(),
+          Err(err) => log::error!(target: "app", "{err}"),
+        }
+      }
+    });
+
+    Ok(())
+  }
+
+  /// get clash client url and headers from clash info
+  fn clash_client_info(info: ClashInfo) -> Result<(String, HeaderMap)> {
+    if info.server.is_none() {
+      let status = &info.status;
+      if info.port.is_none() {
+        bail!("failed to parse config.yaml file with status {status}");
+      } else {
+        bail!("failed to parse the server with status {status}");
+      }
+    }
+
+    let server = info.server.unwrap();
+    let server = format!("http://{server}/configs");
+
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", "application/json".parse().unwrap());
+
+    if let Some(secret) = info.secret.as_ref() {
+      let secret = format!("Bearer {}", secret.clone()).parse().unwrap();
+      headers.insert("Authorization", secret);
+    }
+
+    Ok((server, headers))
   }
 }
 
@@ -201,6 +233,7 @@ pub mod win_service {
   use anyhow::Context;
   use deelevate::{PrivilegeLevel, Token};
   use runas::Command as RunasCommand;
+  use serde::{Deserialize, Serialize};
   use std::os::windows::process::CommandExt;
   use std::{env::current_exe, process::Command as StdCommand};
 

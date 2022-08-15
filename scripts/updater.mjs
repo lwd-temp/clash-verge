@@ -53,18 +53,12 @@ async function resolveUpdater() {
     const { name, browser_download_url } = asset;
 
     // win64 url
-    if (
-      name.endsWith(".msi.zip") &&
-      (!updateData.platforms.win64.url || name.includes("en-US"))
-    ) {
+    if (name.endsWith(".msi.zip") && name.includes("en-US")) {
       updateData.platforms.win64.url = browser_download_url;
       updateData.platforms["windows-x86_64"].url = browser_download_url;
     }
     // win64 signature
-    if (
-      name.endsWith(".msi.zip.sig") &&
-      (!updateData.platforms.win64.signature || name.includes("en-US"))
-    ) {
+    if (name.endsWith(".msi.zip.sig") && name.includes("en-US")) {
       const sig = await getSignature(browser_download_url);
       updateData.platforms.win64.signature = sig;
       updateData.platforms["windows-x86_64"].signature = sig;
@@ -83,11 +77,11 @@ async function resolveUpdater() {
     }
 
     // darwin url (aarch)
-    if (name.endsWith("aarch.app.tar.gz")) {
+    if (name.endsWith("aarch64.app.tar.gz")) {
       updateData.platforms["darwin-aarch64"].url = browser_download_url;
     }
     // darwin signature (aarch)
-    if (name.endsWith("aarch.app.tar.gz.sig")) {
+    if (name.endsWith("aarch64.app.tar.gz.sig")) {
       const sig = await getSignature(browser_download_url);
       updateData.platforms["darwin-aarch64"].signature = sig;
     }

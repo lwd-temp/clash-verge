@@ -1,13 +1,11 @@
 import dayjs from "dayjs";
+import { mutate } from "swr";
 import { useEffect, useState } from "react";
 import { useLockFn } from "ahooks";
-import { useSWRConfig } from "swr";
 import { useRecoilState } from "recoil";
 import { useTranslation } from "react-i18next";
 import {
-  alpha,
   Box,
-  styled,
   Typography,
   LinearProgress,
   IconButton,
@@ -16,32 +14,18 @@ import {
   Menu,
 } from "@mui/material";
 import { RefreshRounded } from "@mui/icons-material";
-import { CmdType } from "../../services/types";
-import { atomLoadingCache } from "../../services/states";
-import { updateProfile, deleteProfile, viewProfile } from "../../services/cmds";
-import parseTraffic from "../../utils/parse-traffic";
-import getSystem from "../../utils/get-system";
-import ProfileEdit from "./profile-edit";
+import { atomLoadingCache } from "@/services/states";
+import { updateProfile, deleteProfile, viewProfile } from "@/services/cmds";
+import parseTraffic from "@/utils/parse-traffic";
+import ProfileBox from "./profile-box";
+import InfoEditor from "./info-editor";
 import FileEditor from "./file-editor";
 import Notice from "../base/base-notice";
-
-const Wrapper = styled(Box)(({ theme }) => ({
-  width: "100%",
-  display: "block",
-  cursor: "pointer",
-  textAlign: "left",
-  borderRadius: theme.shape.borderRadius,
-  boxShadow: theme.shadows[2],
-  padding: "8px 16px",
-  boxSizing: "border-box",
-}));
 
 const round = keyframes`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 `;
-
-const OS = getSystem();
 
 interface Props {
   selected: boolean;
@@ -53,7 +37,6 @@ const ProfileItem = (props: Props) => {
   const { selected, itemData, onSelect } = props;
 
   const { t } = useTranslation();
-  const { mutate } = useSWRConfig();
   const [anchorEl, setAnchorEl] = useState<any>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const [loadingCache, setLoadingCache] = useRecoilState(atomLoadingCache);
@@ -62,7 +45,6 @@ const ProfileItem = (props: Props) => {
 
   // local file mode
   // remote file mode
-  // subscription url mode
   const hasUrl = !!itemData.url;
   const hasExtra = !!extra; // only subscription url has extra info
 
@@ -83,7 +65,6 @@ const ProfileItem = (props: Props) => {
     const handler = () => {
       const now = Date.now();
       const lastUpdate = updated * 1000;
-
       // 大于一天的不管
       if (now - lastUpdate >= 24 * 36e5) return;
 
@@ -156,13 +137,6 @@ const ProfileItem = (props: Props) => {
     }
   });
 
-  const boxStyle = {
-    height: 26,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  };
-
   const urlModeMenu = [
     { label: "Select", handler: onForceSelect },
     { label: "Edit Info", handler: onEditInfo },
@@ -180,36 +154,17 @@ const ProfileItem = (props: Props) => {
     { label: "Delete", handler: onDelete },
   ];
 
+  const boxStyle = {
+    height: 26,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  };
+
   return (
     <>
-      <Wrapper
-        sx={({ palette }) => {
-          const { mode, primary, text, grey } = palette;
-          const key = `${mode}-${selected}`;
-
-          const bgcolor = {
-            "light-true": alpha(primary.main, 0.15),
-            "light-false": palette.background.paper,
-            "dark-true": alpha(primary.main, 0.35),
-            "dark-false": alpha(grey[700], 0.35),
-          }[key]!;
-
-          const color = {
-            "light-true": text.secondary,
-            "light-false": text.secondary,
-            "dark-true": alpha(text.secondary, 0.75),
-            "dark-false": alpha(text.secondary, 0.75),
-          }[key]!;
-
-          const h2color = {
-            "light-true": primary.main,
-            "light-false": text.primary,
-            "dark-true": primary.light,
-            "dark-false": text.primary,
-          }[key]!;
-
-          return { bgcolor, color, "& h2": { color: h2color } };
-        }}
+      <ProfileBox
+        aria-selected={selected}
         onClick={() => onSelect(false)}
         onContextMenu={(event) => {
           const { clientX, clientY } = event;
@@ -218,9 +173,9 @@ const ProfileItem = (props: Props) => {
           event.preventDefault();
         }}
       >
-        <Box display="flex" justifyContent="space-between">
+        <Box position="relative">
           <Typography
-            width="calc(100% - 40px)"
+            width="calc(100% - 36px)"
             variant="h6"
             component="h2"
             noWrap
@@ -233,10 +188,13 @@ const ProfileItem = (props: Props) => {
           {hasUrl && (
             <IconButton
               sx={{
-                width: 26,
-                height: 26,
+                position: "absolute",
+                p: "3px",
+                top: -1,
+                right: -5,
                 animation: loading ? `1s linear infinite ${round}` : "none",
               }}
+              size="small"
               color="inherit"
               disabled={loading}
               onClick={(e) => {
@@ -244,47 +202,47 @@ const ProfileItem = (props: Props) => {
                 onUpdate(false);
               }}
             >
-              <RefreshRounded />
+              <RefreshRounded color="inherit" />
             </IconButton>
           )}
         </Box>
 
         {/* the second line show url's info or description */}
-        {hasUrl ? (
-          <Box sx={boxStyle}>
-            <Typography noWrap title={`From: ${from}`}>
-              {from}
-            </Typography>
+        <Box sx={boxStyle}>
+          {hasUrl ? (
+            <>
+              <Typography noWrap title={`From: ${from}`}>
+                {from}
+              </Typography>
 
-            <Typography
-              noWrap
-              flex="1 0 auto"
-              fontSize={14}
-              textAlign="right"
-              title="updated time"
-            >
-              {updated > 0 ? dayjs(updated * 1000).fromNow() : ""}
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={boxStyle}>
+              <Typography
+                noWrap
+                flex="1 0 auto"
+                fontSize={14}
+                textAlign="right"
+                title={`Updated Time: ${parseExpire(updated)}`}
+              >
+                {updated > 0 ? dayjs(updated * 1000).fromNow() : ""}
+              </Typography>
+            </>
+          ) : (
             <Typography noWrap title={itemData.desc}>
               {itemData.desc}
             </Typography>
-          </Box>
-        )}
+          )}
+        </Box>
 
         {/* the third line show extra info or last updated time */}
         {hasExtra ? (
           <Box sx={{ ...boxStyle, fontSize: 14 }}>
-            <span title="used / total">
+            <span title="Used / Total">
               {parseTraffic(upload + download)} / {parseTraffic(total)}
             </span>
-            <span title="expire time">{expire}</span>
+            <span title="Expire Time">{expire}</span>
           </Box>
         ) : (
           <Box sx={{ ...boxStyle, fontSize: 14, justifyContent: "flex-end" }}>
-            <span title="updated time">{parseExpire(updated)}</span>
+            <span title="Updated Time">{parseExpire(updated)}</span>
           </Box>
         )}
 
@@ -293,7 +251,7 @@ const ProfileItem = (props: Props) => {
           value={progress}
           color="inherit"
         />
-      </Wrapper>
+      </ProfileBox>
 
       <Menu
         open={!!anchorEl}
@@ -302,9 +260,6 @@ const ProfileItem = (props: Props) => {
         anchorPosition={position}
         anchorReference="anchorPosition"
         transitionDuration={225}
-        TransitionProps={
-          OS === "macos" ? { style: { transitionDuration: "225ms" } } : {}
-        }
         onContextMenu={(e) => {
           setAnchorEl(null);
           e.preventDefault();
@@ -321,22 +276,18 @@ const ProfileItem = (props: Props) => {
         ))}
       </Menu>
 
-      {editOpen && (
-        <ProfileEdit
-          open={editOpen}
-          itemData={itemData}
-          onClose={() => setEditOpen(false)}
-        />
-      )}
+      <InfoEditor
+        open={editOpen}
+        itemData={itemData}
+        onClose={() => setEditOpen(false)}
+      />
 
-      {fileOpen && (
-        <FileEditor
-          uid={uid}
-          open={fileOpen}
-          mode="yaml"
-          onClose={() => setFileOpen(false)}
-        />
-      )}
+      <FileEditor
+        uid={uid}
+        open={fileOpen}
+        mode="yaml"
+        onClose={() => setFileOpen(false)}
+      />
     </>
   );
 };

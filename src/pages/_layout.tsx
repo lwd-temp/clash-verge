@@ -10,17 +10,21 @@ import { alpha, List, Paper, ThemeProvider } from "@mui/material";
 import { listen } from "@tauri-apps/api/event";
 import { appWindow } from "@tauri-apps/api/window";
 import { routers } from "./_routers";
-import { getAxios } from "../services/api";
-import { atomCurrentProfile } from "../services/states";
-import { getVergeConfig, getProfiles } from "../services/cmds";
-import { ReactComponent as LogoSvg } from "../assets/image/logo.svg";
-import LayoutItem from "../components/layout/layout-item";
-import LayoutControl from "../components/layout/layout-control";
-import LayoutTraffic from "../components/layout/layout-traffic";
-import UpdateButton from "../components/layout/update-button";
-import useCustomTheme from "../components/layout/use-custom-theme";
-import getSystem from "../utils/get-system";
+import { getAxios } from "@/services/api";
+import { atomCurrentProfile } from "@/services/states";
+import { getVergeConfig, getProfiles } from "@/services/cmds";
+import { ReactComponent as LogoSvg } from "@/assets/image/logo.svg";
+import LayoutItem from "@/components/layout/layout-item";
+import LayoutControl from "@/components/layout/layout-control";
+import LayoutTraffic from "@/components/layout/layout-traffic";
+import UpdateButton from "@/components/layout/update-button";
+import useCustomTheme from "@/components/layout/use-custom-theme";
+import getSystem from "@/utils/get-system";
 import "dayjs/locale/zh-cn";
+
+declare global {
+  const WIN_PORTABLE: boolean;
+}
 
 dayjs.extend(relativeTime);
 
@@ -87,7 +91,9 @@ const Layout = () => {
             <div className="the-logo" data-windrag>
               <LogoSvg />
 
-              <UpdateButton className="the-newbtn" />
+              {!(OS === "windows" && WIN_PORTABLE) && (
+                <UpdateButton className="the-newbtn" />
+              )}
             </div>
 
             <List className="the-menu">

@@ -1,35 +1,37 @@
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 import { useSetRecoilState } from "recoil";
 import { useTranslation } from "react-i18next";
 import {
-  ListItemText,
   TextField,
   Switch,
   Select,
   MenuItem,
   Typography,
-  Box,
+  IconButton,
 } from "@mui/material";
-import { ApiType } from "../../services/types";
-import { atomClashPort } from "../../services/states";
-import { patchClashConfig } from "../../services/cmds";
+import { atomClashPort } from "@/services/states";
+import { ArrowForward } from "@mui/icons-material";
+import { patchClashConfig } from "@/services/cmds";
 import { SettingList, SettingItem } from "./setting";
-import { getClashConfig, getVersion, updateConfigs } from "../../services/api";
+import { getClashConfig, getVersion, updateConfigs } from "@/services/api";
+import useModalHandler from "@/hooks/use-modal-handler";
 import Notice from "../base/base-notice";
-import GuardState from "./guard-state";
-import CoreSwitch from "./core-switch";
+import GuardState from "./mods/guard-state";
+import CoreSwitch from "./mods/core-switch";
+import WebUIViewer from "./mods/web-ui-viewer";
+import ClashFieldViewer from "./mods/clash-field-viewer";
 
 interface Props {
   onError: (err: Error) => void;
 }
 
-// const MULTI_CORE = !!import.meta.env.VITE_MULTI_CORE;
-const MULTI_CORE = true;
-
 const SettingClash = ({ onError }: Props) => {
   const { t } = useTranslation();
-  const { mutate } = useSWRConfig();
-  const { data: clashConfig } = useSWR("getClashConfig", getClashConfig);
+
+  const { data: clashConfig, mutate: mutateClash } = useSWR(
+    "getClashConfig",
+    getClashConfig
+  );
   const { data: versionData } = useSWR("getVersion", getVersion);
 
   const {
@@ -41,9 +43,12 @@ const SettingClash = ({ onError }: Props) => {
 
   const setGlobalClashPort = useSetRecoilState(atomClashPort);
 
+  const webUIHandler = useModalHandler();
+  const fieldHandler = useModalHandler();
+
   const onSwitchFormat = (_e: any, value: boolean) => value;
   const onChangeData = (patch: Partial<ApiType.ConfigData>) => {
-    mutate("getClashConfig", { ...clashConfig, ...patch }, false);
+    mutateClash((old) => ({ ...(old! || {}), ...patch }), false);
   };
   const onUpdateData = async (patch: Partial<ApiType.ConfigData>) => {
     await updateConfigs(patch);
@@ -62,7 +67,7 @@ const SettingClash = ({ onError }: Props) => {
     Notice.success("Change Clash port successfully!", 1000);
 
     // update the config
-    mutate("getClashConfig");
+    mutateClash();
   };
 
   // get clash core version
@@ -72,8 +77,10 @@ const SettingClash = ({ onError }: Props) => {
 
   return (
     <SettingList title={t("Clash Setting")}>
-      <SettingItem>
-        <ListItemText primary={t("Allow Lan")} />
+      <WebUIViewer handler={webUIHandler} onError={onError} />
+      <ClashFieldViewer handler={fieldHandler} />
+
+      <SettingItem label={t("Allow Lan")}>
         <GuardState
           value={allowLan ?? false}
           valueProps="checked"
@@ -86,8 +93,7 @@ const SettingClash = ({ onError }: Props) => {
         </GuardState>
       </SettingItem>
 
-      <SettingItem>
-        <ListItemText primary={t("IPv6")} />
+      <SettingItem label={t("IPv6")}>
         <GuardState
           value={ipv6 ?? false}
           valueProps="checked"
@@ -100,8 +106,7 @@ const SettingClash = ({ onError }: Props) => {
         </GuardState>
       </SettingItem>
 
-      <SettingItem>
-        <ListItemText primary={t("Log Level")} />
+      <SettingItem label={t("Log Level")}>
         <GuardState
           value={logLevel ?? "info"}
           onCatch={onError}
@@ -109,7 +114,7 @@ const SettingClash = ({ onError }: Props) => {
           onChange={(e) => onChangeData({ "log-level": e })}
           onGuard={(e) => onUpdateData({ "log-level": e })}
         >
-          <Select size="small" sx={{ width: 120 }}>
+          <Select size="small" sx={{ width: 120, "> div": { py: "7.5px" } }}>
             <MenuItem value="debug">Debug</MenuItem>
             <MenuItem value="info">Info</MenuItem>
             <MenuItem value="warning">Warning</MenuItem>
@@ -119,8 +124,7 @@ const SettingClash = ({ onError }: Props) => {
         </GuardState>
       </SettingItem>
 
-      <SettingItem>
-        <ListItemText primary={t("Mixed Port")} />
+      <SettingItem label={t("Mixed Port")}>
         <GuardState
           value={mixedPort ?? 0}
           onCatch={onError}
@@ -129,24 +133,38 @@ const SettingClash = ({ onError }: Props) => {
           onGuard={onUpdatePort}
           waitTime={1000}
         >
-          <TextField autoComplete="off" size="small" sx={{ width: 120 }} />
+          <TextField
+            autoComplete="off"
+            size="small"
+            sx={{ width: 120, input: { py: "7.5px" } }}
+          />
         </GuardState>
       </SettingItem>
 
-      <SettingItem>
-        <ListItemText
-          primary={
-            MULTI_CORE ? (
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <span style={{ marginRight: 4 }}>{t("Clash Core")}</span>
-                <CoreSwitch />
-              </Box>
-            ) : (
-              t("Clash Core")
-            )
-          }
-        />
-        <Typography sx={{ py: 1 }}>{clashVer}</Typography>
+      <SettingItem label={t("Web UI")}>
+        <IconButton
+          color="inherit"
+          size="small"
+          sx={{ my: "2px" }}
+          onClick={() => webUIHandler.current.open()}
+        >
+          <ArrowForward />
+        </IconButton>
+      </SettingItem>
+
+      <SettingItem label={t("Clash Field")}>
+        <IconButton
+          color="inherit"
+          size="small"
+          sx={{ my: "2px" }}
+          onClick={() => fieldHandler.current.open()}
+        >
+          <ArrowForward />
+        </IconButton>
+      </SettingItem>
+
+      <SettingItem label={t("Clash Core")} extra={<CoreSwitch />}>
+        <Typography sx={{ py: "7px" }}>{clashVer}</Typography>
       </SettingItem>
     </SettingList>
   );

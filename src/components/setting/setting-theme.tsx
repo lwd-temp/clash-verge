@@ -15,8 +15,8 @@ import {
   TextField,
   useTheme,
 } from "@mui/material";
-import { getVergeConfig, patchVergeConfig } from "../../services/cmds";
-import { defaultTheme, defaultDarkTheme } from "../../pages/_theme";
+import { getVergeConfig, patchVergeConfig } from "@/services/cmds";
+import { defaultTheme, defaultDarkTheme } from "@/pages/_theme";
 
 interface Props {
   open: boolean;
@@ -142,7 +142,9 @@ const SettingTheme = (props: Props) => {
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>{t("Cancel")}</Button>
+        <Button variant="outlined" onClick={onClose}>
+          {t("Cancel")}
+        </Button>
         <Button onClick={onSave} variant="contained">
           {t("Save")}
         </Button>

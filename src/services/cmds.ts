@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/tauri";
-import { ApiType, CmdType } from "./types";
-import Notice from "../components/base/base-notice";
+import Notice from "@/components/base/base-notice";
 
 export async function getProfiles() {
   return invoke<CmdType.ProfilesConfig>("get_profiles");
@@ -70,6 +69,22 @@ export async function getClashInfo() {
   return invoke<CmdType.ClashInfo | null>("get_clash_info");
 }
 
+export async function getRuntimeConfig() {
+  return invoke<any | null>("get_runtime_config");
+}
+
+export async function getRuntimeYaml() {
+  return invoke<string | null>("get_runtime_yaml");
+}
+
+export async function getRuntimeExists() {
+  return invoke<string[]>("get_runtime_exists");
+}
+
+export async function getRuntimeLogs() {
+  return invoke<Record<string, [string, string][]>>("get_runtime_logs");
+}
+
 export async function patchClashConfig(payload: Partial<ApiType.ConfigData>) {
   return invoke<void>("patch_clash_config", { payload });
 }
@@ -108,6 +123,10 @@ export async function openLogsDir() {
   return invoke<void>("open_logs_dir").catch((err) =>
     Notice.error(err?.message || err.toString(), 1500)
   );
+}
+
+export async function openWebUrl(url: string) {
+  return invoke<void>("open_web_url", { url });
 }
 
 /// service mode

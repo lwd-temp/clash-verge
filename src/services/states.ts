@@ -1,5 +1,9 @@
 import { atom } from "recoil";
-import { ApiType } from "./types";
+
+export const atomThemeMode = atom<"light" | "dark">({
+  key: "atomThemeMode",
+  default: "light",
+});
 
 export const atomClashPort = atom<number>({
   key: "atomClashPort",

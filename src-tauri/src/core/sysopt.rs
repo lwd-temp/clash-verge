@@ -2,7 +2,6 @@ use super::{Clash, Verge};
 use crate::{log_if_err, utils::sysopt::SysProxyConfig};
 use anyhow::{bail, Result};
 use auto_launch::{AutoLaunch, AutoLaunchBuilder};
-// use parking_lot::Mutex;
 use std::sync::Arc;
 use tauri::{async_runtime::Mutex, utils::platform::current_exe};
 
@@ -46,7 +45,7 @@ impl Sysopt {
 
       if enable {
         if let Err(err) = sysproxy.set_sys() {
-          log::error!("failed to set system proxy for `{err}`");
+          log::error!(target: "app", "failed to set system proxy for `{err}`");
         }
       }
 
@@ -88,9 +87,17 @@ impl Sysopt {
   /// reset the sysproxy
   pub fn reset_sysproxy(&mut self) {
     if let Some(sysproxy) = self.old_sysproxy.take() {
+      // 如果原代理设置是开启的，且域名端口设置和当前的一致，就不恢复原设置
+      // https://github.com/zzzgydi/clash-verge/issues/157
+      if let Some(cur) = self.cur_sysproxy.as_ref() {
+        if sysproxy.enable && cur.server == sysproxy.server {
+          return;
+        }
+      }
+
       match sysproxy.set_sys() {
         Ok(_) => self.cur_sysproxy = None,
-        Err(_) => log::error!("failed to reset proxy"),
+        Err(_) => log::error!(target: "app", "failed to reset proxy"),
       }
     }
   }
@@ -183,7 +190,7 @@ impl Sysopt {
           break;
         }
 
-        log::debug!("try to guard the system proxy");
+        log::debug!(target: "app", "try to guard the system proxy");
 
         let clash = Clash::new();
 
@@ -194,7 +201,10 @@ impl Sysopt {
 
             log_if_err!(sysproxy.set_sys());
           }
-          None => log::error!("failed to parse clash port"),
+          None => {
+            let status = &clash.info.status;
+            log::error!(target: "app", "failed to parse clash port with status {status}")
+          }
         }
       }
 

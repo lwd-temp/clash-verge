@@ -18,6 +18,8 @@
   "Profile URL": "Profile URL",
   "Import": "Import",
   "New": "New",
+  "Create Profile": "Create Profile",
+  "Choose File": "Choose File",
   "Close All": "Close All",
   "Select": "Select",
   "Edit Info": "Edit Info",
@@ -55,8 +57,15 @@
   "Language": "Language",
   "Open App Dir": "Open App Dir",
   "Open Logs Dir": "Open Logs Dir",
-  "Version": "Version",
+  "Verge Version": "Verge Version",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
+  "theme.system": "System",
+  "Clash Field": "Clash Field",
+  "Runtime Config": "Runtime Config",
+  "ReadOnly": "ReadOnly",
 
+  "Back": "Back",
   "Save": "Save",
   "Cancel": "Cancel"
 }

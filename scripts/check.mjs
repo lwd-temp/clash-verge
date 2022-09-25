@@ -20,7 +20,7 @@ function resolveClash() {
 
   const CLASH_URL_PREFIX =
     "https://github.com/Dreamacro/clash/releases/download/premium/";
-  const CLASH_LATEST_DATE = "2022.07.07";
+  const CLASH_LATEST_DATE = "2022.08.26";
 
   // todo
   const map = {
@@ -52,7 +52,7 @@ async function resolveClashMeta() {
   const { platform, arch } = process;
 
   const urlPrefix = `https://github.com/MetaCubeX/Clash.Meta/releases/download/`;
-  const latestVersion = "v1.12.0";
+  const latestVersion = "v1.13.1";
 
   const map = {
     "win32-x64": "Clash.Meta-windows-amd64",
@@ -258,7 +258,7 @@ async function resolveService() {
  */
 async function resolveMmdb() {
   const url =
-    "https://github.com/Dreamacro/maxmind-geoip/releases/download/20220512/Country.mmdb";
+    "https://github.com/Dreamacro/maxmind-geoip/releases/download/20220812/Country.mmdb";
 
   const resDir = path.join(cwd, "src-tauri", "resources");
   const resPath = path.join(resDir, "Country.mmdb");

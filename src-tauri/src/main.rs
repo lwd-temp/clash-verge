@@ -6,10 +6,12 @@
 mod cmds;
 mod config;
 mod core;
+mod data;
+mod feat;
 mod utils;
 
 use crate::{
-  core::Verge,
+  data::Verge,
   utils::{resolve, server},
 };
 use tauri::{
@@ -17,15 +19,24 @@ use tauri::{
 };
 
 fn main() -> std::io::Result<()> {
-  if server::check_singleton().is_err() {
+  let mut context = tauri::generate_context!();
+
+  let verge = Verge::new();
+
+  if server::check_singleton(verge.app_singleton_port).is_err() {
     println!("app exists");
     return Ok(());
+  }
+
+  for win in context.config_mut().tauri.windows.iter_mut() {
+    if verge.enable_silent_start.unwrap_or(false) {
+      win.visible = false;
+    }
   }
 
   #[cfg(target_os = "windows")]
   unsafe {
     use crate::utils::dirs;
-
     dirs::init_portable_flag();
   }
 
@@ -55,48 +66,15 @@ fn main() -> std::io::Result<()> {
         }
         mode @ ("rule_mode" | "global_mode" | "direct_mode" | "script_mode") => {
           let mode = &mode[0..mode.len() - 5];
-          let core = app_handle.state::<core::Core>();
-          crate::log_if_err!(core.update_mode(app_handle, mode));
+          feat::change_clash_mode(mode);
         }
-        "system_proxy" => {
-          let core = app_handle.state::<core::Core>();
-
-          let new_value = {
-            let verge = core.verge.lock();
-            !verge.enable_system_proxy.clone().unwrap_or(false)
-          };
-
-          let patch = Verge {
-            enable_system_proxy: Some(new_value),
-            ..Verge::default()
-          };
-
-          crate::log_if_err!(core.patch_verge(patch, app_handle));
-        }
-        "tun_mode" => {
-          let core = app_handle.state::<core::Core>();
-
-          let new_value = {
-            let verge = core.verge.lock();
-            !verge.enable_tun_mode.clone().unwrap_or(false)
-          };
-
-          let patch = Verge {
-            enable_tun_mode: Some(new_value),
-            ..Verge::default()
-          };
-
-          crate::log_if_err!(core.patch_verge(patch, app_handle));
-        }
-        "restart_clash" => {
-          let core = app_handle.state::<core::Core>();
-          crate::log_if_err!(core.restart_clash());
-        }
+        "system_proxy" => feat::toggle_system_proxy(),
+        "tun_mode" => feat::toggle_tun_mode(),
         "restart_app" => {
           api::process::restart(&app_handle.env());
         }
         "quit" => {
-          resolve::resolve_reset(app_handle);
+          resolve::resolve_reset();
           app_handle.exit(0);
         }
         _ => {}
@@ -110,7 +88,6 @@ fn main() -> std::io::Result<()> {
     .invoke_handler(tauri::generate_handler![
       // common
       cmds::get_sys_proxy,
-      cmds::get_cur_proxy,
       cmds::open_app_dir,
       cmds::open_logs_dir,
       cmds::open_web_url,
@@ -118,6 +95,7 @@ fn main() -> std::io::Result<()> {
       cmds::restart_sidecar,
       // clash
       cmds::get_clash_info,
+      cmds::get_clash_logs,
       cmds::patch_clash_config,
       cmds::change_clash_core,
       cmds::get_runtime_config,
@@ -127,6 +105,7 @@ fn main() -> std::io::Result<()> {
       // verge
       cmds::get_verge_config,
       cmds::patch_verge_config,
+      cmds::update_hotkeys,
       // profile
       cmds::view_profile,
       cmds::patch_profile,
@@ -166,26 +145,42 @@ fn main() -> std::io::Result<()> {
     builder = builder.menu(Menu::new().add_submenu(submenu_file));
   }
 
-  let mut context = tauri::generate_context!();
-  let verge = Verge::new();
-  for win in context.config_mut().tauri.windows.iter_mut() {
-    if verge.enable_silent_start.unwrap_or(false) {
-      win.visible = false;
-    }
-  }
-  builder
+  let app = builder
     .build(context)
-    .expect("error while running tauri application")
-    .run(|app_handle, e| match e {
-      tauri::RunEvent::ExitRequested { api, .. } => {
-        api.prevent_exit();
+    .expect("error while running tauri application");
+
+  let app_handle = app.app_handle();
+  ctrlc::set_handler(move || {
+    resolve::resolve_reset();
+    app_handle.exit(0);
+  })
+  .expect("error while exiting.");
+
+  #[allow(unused)]
+  app.run(|app_handle, e| match e {
+    tauri::RunEvent::ExitRequested { api, .. } => {
+      api.prevent_exit();
+    }
+    tauri::RunEvent::Exit => {
+      resolve::resolve_reset();
+      api::process::kill_children();
+    }
+    #[cfg(target_os = "macos")]
+    tauri::RunEvent::WindowEvent { label, event, .. } => {
+      if label == "main" {
+        match event {
+          tauri::WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            app_handle.get_window("main").map(|win| {
+              let _ = win.hide();
+            });
+          }
+          _ => {}
+        }
       }
-      tauri::RunEvent::Exit => {
-        resolve::resolve_reset(app_handle);
-        api::process::kill_children();
-      }
-      _ => {}
-    });
+    }
+    _ => {}
+  });
 
   Ok(())
 }

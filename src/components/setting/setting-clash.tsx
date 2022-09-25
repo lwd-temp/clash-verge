@@ -1,5 +1,4 @@
 import useSWR from "swr";
-import { useSetRecoilState } from "recoil";
 import { useTranslation } from "react-i18next";
 import {
   TextField,
@@ -9,17 +8,16 @@ import {
   Typography,
   IconButton,
 } from "@mui/material";
-import { atomClashPort } from "@/services/states";
 import { ArrowForward } from "@mui/icons-material";
 import { patchClashConfig } from "@/services/cmds";
 import { SettingList, SettingItem } from "./setting";
 import { getClashConfig, getVersion, updateConfigs } from "@/services/api";
 import useModalHandler from "@/hooks/use-modal-handler";
-import Notice from "../base/base-notice";
 import GuardState from "./mods/guard-state";
 import CoreSwitch from "./mods/core-switch";
 import WebUIViewer from "./mods/web-ui-viewer";
 import ClashFieldViewer from "./mods/clash-field-viewer";
+import ClashPortViewer from "./mods/clash-port-viewer";
 
 interface Props {
   onError: (err: Error) => void;
@@ -41,10 +39,9 @@ const SettingClash = ({ onError }: Props) => {
     "mixed-port": mixedPort,
   } = clashConfig ?? {};
 
-  const setGlobalClashPort = useSetRecoilState(atomClashPort);
-
   const webUIHandler = useModalHandler();
   const fieldHandler = useModalHandler();
+  const portHandler = useModalHandler();
 
   const onSwitchFormat = (_e: any, value: boolean) => value;
   const onChangeData = (patch: Partial<ApiType.ConfigData>) => {
@@ -53,21 +50,6 @@ const SettingClash = ({ onError }: Props) => {
   const onUpdateData = async (patch: Partial<ApiType.ConfigData>) => {
     await updateConfigs(patch);
     await patchClashConfig(patch);
-  };
-
-  const onUpdatePort = async (port: number) => {
-    if (port < 1000) {
-      throw new Error("The port should not < 1000");
-    }
-    if (port > 65536) {
-      throw new Error("The port should not > 65536");
-    }
-    await patchClashConfig({ "mixed-port": port });
-    setGlobalClashPort(port);
-    Notice.success("Change Clash port successfully!", 1000);
-
-    // update the config
-    mutateClash();
   };
 
   // get clash core version
@@ -79,6 +61,7 @@ const SettingClash = ({ onError }: Props) => {
     <SettingList title={t("Clash Setting")}>
       <WebUIViewer handler={webUIHandler} onError={onError} />
       <ClashFieldViewer handler={fieldHandler} />
+      <ClashPortViewer handler={portHandler} />
 
       <SettingItem label={t("Allow Lan")}>
         <GuardState
@@ -108,16 +91,17 @@ const SettingClash = ({ onError }: Props) => {
 
       <SettingItem label={t("Log Level")}>
         <GuardState
-          value={logLevel ?? "info"}
+          // clash premium 2022.08.26 值为warn
+          value={logLevel === "warn" ? "warning" : logLevel ?? "info"}
           onCatch={onError}
           onFormat={(e: any) => e.target.value}
           onChange={(e) => onChangeData({ "log-level": e })}
           onGuard={(e) => onUpdateData({ "log-level": e })}
         >
-          <Select size="small" sx={{ width: 120, "> div": { py: "7.5px" } }}>
+          <Select size="small" sx={{ width: 100, "> div": { py: "7.5px" } }}>
             <MenuItem value="debug">Debug</MenuItem>
             <MenuItem value="info">Info</MenuItem>
-            <MenuItem value="warning">Warning</MenuItem>
+            <MenuItem value="warning">Warn</MenuItem>
             <MenuItem value="error">Error</MenuItem>
             <MenuItem value="silent">Silent</MenuItem>
           </Select>
@@ -125,20 +109,16 @@ const SettingClash = ({ onError }: Props) => {
       </SettingItem>
 
       <SettingItem label={t("Mixed Port")}>
-        <GuardState
+        <TextField
+          autoComplete="off"
+          size="small"
           value={mixedPort ?? 0}
-          onCatch={onError}
-          onFormat={(e: any) => +e.target.value?.replace(/\D+/, "")}
-          onChange={(e) => onChangeData({ "mixed-port": e })}
-          onGuard={onUpdatePort}
-          waitTime={1000}
-        >
-          <TextField
-            autoComplete="off"
-            size="small"
-            sx={{ width: 120, input: { py: "7.5px" } }}
-          />
-        </GuardState>
+          sx={{ width: 100, input: { py: "7.5px" } }}
+          onClick={(e) => {
+            portHandler.current.open();
+            (e.target as any).blur();
+          }}
+        />
       </SettingItem>
 
       <SettingItem label={t("Web UI")}>

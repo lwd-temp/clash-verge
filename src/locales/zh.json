@@ -3,6 +3,7 @@
   "Label-Profiles": "配 置",
   "Label-Connections": "连 接",
   "Label-Logs": "日 志",
+  "Label-Rules": "规 则",
   "Label-Settings": "设 置",
 
   "Connections": "连接",
@@ -34,6 +35,23 @@
   "To Top": "移到最前",
   "To End": "移到末尾",
 
+  "Location": "当前节点",
+  "Delay check": "延迟测试",
+  "Sort by default": "默认排序",
+  "Sort by delay": "按延迟排序",
+  "Sort by name": "按名称排序",
+  "Delay check URL": "延迟测试链接",
+  "Proxy detail": "展示节点细节",
+  "Filter": "过滤节点",
+  "Filter conditions": "过滤条件",
+  "Refresh profiles": "刷新配置",
+
+  "Type": "类型",
+  "Name": "名称",
+  "Descriptions": "描述",
+  "Subscription URL": "订阅链接",
+  "Update Interval(mins)": "更新间隔(分钟)",
+
   "Settings": "设置",
   "Clash Setting": "Clash 设置",
   "System Setting": "系统设置",
@@ -48,11 +66,15 @@
   "Auto Launch": "开机自启",
   "Silent Start": "静默启动",
   "System Proxy": "系统代理",
+  "System Proxy Setting": "系统代理设置",
   "Proxy Guard": "系统代理守卫",
+  "Guard Duration": "代理守卫间隔",
   "Proxy Bypass": "Proxy Bypass",
+  "Current System Proxy": "当前系统代理",
   "Theme Mode": "主题模式",
   "Theme Blur": "背景模糊",
   "Theme Setting": "主题设置",
+  "Hotkey Setting": "热键设置",
   "Traffic Graph": "流量图显",
   "Language": "语言设置",
   "Open App Dir": "应用目录",
@@ -67,5 +89,20 @@
 
   "Back": "返回",
   "Save": "保存",
-  "Cancel": "取消"
+  "Cancel": "取消",
+
+  "Default": "默认",
+  "Download Speed": "下载速度",
+  "Upload Speed": "上传速度",
+
+  "clash_mode_rule": "规则模式",
+  "clash_mode_global": "全局模式",
+  "clash_mode_direct": "直连模式",
+  "clash_mode_script": "脚本模式",
+  "toggle_system_proxy": "切换系统代理",
+  "enable_system_proxy": "开启系统代理",
+  "disable_system_proxy": "关闭系统代理",
+  "toggle_tun_mode": "切换Tun模式",
+  "enable_tun_mode": "开启Tun模式",
+  "disable_tun_mode": "关闭Tun模式"
 }

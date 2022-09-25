@@ -1,6 +1,29 @@
 import { invoke } from "@tauri-apps/api/tauri";
 import Notice from "@/components/base/base-notice";
 
+export async function getClashLogs() {
+  const regex = /time="(.+?)"\s+level=(.+?)\s+msg="(.+?)"/;
+  const newRegex = /(.+?)\s+(.+?)\s+(.+)/;
+  const logs = await invoke<string[]>("get_clash_logs");
+
+  return logs
+    .map((log) => {
+      const result = log.match(regex);
+      if (result) {
+        const [_, time, type, payload] = result;
+        return { time, type, payload };
+      }
+
+      const result2 = log.match(newRegex);
+      if (result2) {
+        const [_, time, type, payload] = result2;
+        return { time, type, payload };
+      }
+      return null;
+    })
+    .filter(Boolean) as ApiType.LogItem[];
+}
+
 export async function getProfiles() {
   return invoke<CmdType.ProfilesConfig>("get_profiles");
 }
@@ -98,7 +121,11 @@ export async function patchVergeConfig(payload: CmdType.VergeConfig) {
 }
 
 export async function getSystemProxy() {
-  return invoke<any>("get_sys_proxy");
+  return invoke<{
+    enable: boolean;
+    server: string;
+    bypass: string;
+  }>("get_sys_proxy");
 }
 
 export async function changeClashCore(clashCore: string) {

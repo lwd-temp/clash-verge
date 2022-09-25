@@ -3,6 +3,7 @@
   "Label-Profiles": "Profiles",
   "Label-Connections": "Connections",
   "Label-Logs": "Logs",
+  "Label-Rules": "Rules",
   "Label-Settings": "Settings",
 
   "Connections": "Connections",
@@ -34,6 +35,23 @@
   "To Top": "To Top",
   "To End": "To End",
 
+  "Location": "Location",
+  "Delay check": "Delay check",
+  "Sort by default": "Sort by default",
+  "Sort by delay": "Sort by delay",
+  "Sort by name": "Sort by name",
+  "Delay check URL": "Delay check URL",
+  "Proxy detail": "Proxy detail",
+  "Filter": "Filter",
+  "Filter conditions": "Filter conditions",
+  "Refresh profiles": "Refresh profiles",
+
+  "Type": "Type",
+  "Name": "Name",
+  "Descriptions": "Descriptions",
+  "Subscription URL": "Subscription URL",
+  "Update Interval(mins)": "Update Interval(mins)",
+
   "Settings": "Settings",
   "Clash Setting": "Clash Setting",
   "System Setting": "System Setting",
@@ -48,11 +66,15 @@
   "Auto Launch": "Auto Launch",
   "Silent Start": "Silent Start",
   "System Proxy": "System Proxy",
+  "System Proxy Setting": "System Proxy Setting",
   "Proxy Guard": "Proxy Guard",
+  "Guard Duration": "Guard Duration",
   "Proxy Bypass": "Proxy Bypass",
+  "Current System Proxy": "Current System Proxy",
   "Theme Mode": "Theme Mode",
   "Theme Blur": "Theme Blur",
   "Theme Setting": "Theme Setting",
+  "Hotkey Setting": "Hotkey Setting",
   "Traffic Graph": "Traffic Graph",
   "Language": "Language",
   "Open App Dir": "Open App Dir",
@@ -67,5 +89,16 @@
 
   "Back": "Back",
   "Save": "Save",
-  "Cancel": "Cancel"
+  "Cancel": "Cancel",
+
+  "clash_mode_rule": "Rule Mode",
+  "clash_mode_global": "Global Mode",
+  "clash_mode_direct": "Direct Mode",
+  "clash_mode_script": "Script Mode",
+  "toggle_system_proxy": "Toggle System Proxy",
+  "enable_system_proxy": "Enable System Proxy",
+  "disable_system_proxy": "Disable System Proxy",
+  "toggle_tun_mode": "Toggle Tun Mode",
+  "enable_tun_mode": "Enable Tun Mode",
+  "disable_tun_mode": "Disable Tun Mode"
 }

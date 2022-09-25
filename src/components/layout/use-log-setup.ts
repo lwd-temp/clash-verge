@@ -1,19 +1,24 @@
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
-import { useSetRecoilState } from "recoil";
+import { useRecoilValue, useSetRecoilState } from "recoil";
 import { listen } from "@tauri-apps/api/event";
 import { getInformation } from "@/services/api";
-import { atomLogData } from "@/services/states";
+import { getClashLogs } from "@/services/cmds";
+import { atomEnableLog, atomLogData } from "@/services/states";
 
 const MAX_LOG_NUM = 1000;
 
 // setup the log websocket
 export default function useLogSetup() {
   const [refresh, setRefresh] = useState({});
+
+  const enableLog = useRecoilValue(atomEnableLog);
   const setLogData = useSetRecoilState(atomLogData);
 
   useEffect(() => {
-    let ws: WebSocket = null!;
+    if (!enableLog) return;
+
+    getClashLogs().then(setLogData);
 
     const handler = (event: MessageEvent<any>) => {
       const data = JSON.parse(event.data) as ApiType.LogItem;
@@ -24,10 +29,11 @@ export default function useLogSetup() {
       });
     };
 
-    getInformation().then((info) => {
+    const ws = getInformation().then((info) => {
       const { server = "", secret = "" } = info;
-      ws = new WebSocket(`ws://${server}/logs?token=${secret}`);
+      const ws = new WebSocket(`ws://${server}/logs?token=${secret}`);
       ws.addEventListener("message", handler);
+      return ws;
     });
 
     const unlisten = listen("verge://refresh-clash-config", () =>
@@ -35,8 +41,8 @@ export default function useLogSetup() {
     );
 
     return () => {
-      ws?.close();
-      unlisten?.then((fn) => fn());
+      ws.then((ws) => ws?.close());
+      unlisten.then((fn) => fn());
     };
-  }, [refresh]);
+  }, [refresh, enableLog]);
 }

@@ -31,11 +31,20 @@ declare namespace ApiType {
     }[];
     all?: string[];
     now?: string;
+    provider?: string; // 记录是否来自provider
   }
 
   type ProxyGroupItem = Omit<ProxyItem, "all"> & {
     all: ProxyItem[];
   };
+
+  interface ProviderItem {
+    name: string;
+    type: string;
+    proxies: ProxyItem[];
+    updatedAt: string;
+    vehicleType: string;
+  }
 
   interface TrafficItem {
     up: number;
@@ -58,6 +67,8 @@ declare namespace ApiType {
       sourcePort: string;
       destinationPort: string;
       destinationIP?: string;
+      process?: string;
+      processPath?: string;
     };
     upload: number;
     download: number;
@@ -65,8 +76,8 @@ declare namespace ApiType {
     chains: string[];
     rule: string;
     rulePayload: string;
-    curUpload?: number; // calculate
-    curDownload?: number; // calculate
+    curUpload?: number; // upload speed, calculate at runtime
+    curDownload?: number; // download speed, calculate at runtime
   }
 
   interface Connections {
@@ -135,8 +146,10 @@ declare namespace CmdType {
     enable_silent_start?: boolean;
     enable_system_proxy?: boolean;
     enable_proxy_guard?: boolean;
+    proxy_guard_duration?: number;
     system_proxy_bypass?: string;
     web_ui_list?: string[];
+    hotkeys?: string[];
     theme_setting?: {
       primary_color?: string;
       secondary_color?: string;

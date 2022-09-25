@@ -1,15 +1,29 @@
 import { useMemo, useState } from "react";
 import { useRecoilState } from "recoil";
-import { Box, Button, MenuItem, Paper, Select, TextField } from "@mui/material";
+import {
+  Box,
+  Button,
+  IconButton,
+  MenuItem,
+  Paper,
+  Select,
+  TextField,
+} from "@mui/material";
 import { Virtuoso } from "react-virtuoso";
 import { useTranslation } from "react-i18next";
-import { atomLogData } from "@/services/states";
+import {
+  PlayCircleOutlineRounded,
+  PauseCircleOutlineRounded,
+} from "@mui/icons-material";
+import { atomEnableLog, atomLogData } from "@/services/states";
 import BasePage from "@/components/base/base-page";
+import BaseEmpty from "@/components/base/base-empty";
 import LogItem from "@/components/log/log-item";
 
 const LogPage = () => {
   const { t } = useTranslation();
   const [logData, setLogData] = useRecoilState(atomLogData);
+  const [enableLog, setEnableLog] = useRecoilState(atomEnableLog);
 
   const [logState, setLogState] = useState("all");
   const [filterText, setFilterText] = useState("");
@@ -28,14 +42,27 @@ const LogPage = () => {
       title={t("Logs")}
       contentStyle={{ height: "100%" }}
       header={
-        <Button
-          size="small"
-          sx={{ mt: 1 }}
-          variant="contained"
-          onClick={() => setLogData([])}
-        >
-          {t("Clear")}
-        </Button>
+        <Box sx={{ mt: 1, display: "flex", alignItems: "center" }}>
+          <IconButton
+            size="small"
+            sx={{ mr: 2 }}
+            onClick={() => setEnableLog((e) => !e)}
+          >
+            {enableLog ? (
+              <PauseCircleOutlineRounded />
+            ) : (
+              <PlayCircleOutlineRounded />
+            )}
+          </IconButton>
+
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => setLogData([])}
+          >
+            {t("Clear")}
+          </Button>
+        </Box>
       }
     >
       <Paper sx={{ boxSizing: "border-box", boxShadow: 2, height: "100%" }}>
@@ -67,7 +94,7 @@ const LogPage = () => {
             size="small"
             autoComplete="off"
             variant="outlined"
-            placeholder="Filter conditions"
+            placeholder={t("Filter conditions")}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             sx={{ input: { py: 0.65, px: 1.25 } }}
@@ -75,12 +102,16 @@ const LogPage = () => {
         </Box>
 
         <Box height="calc(100% - 50px)">
-          <Virtuoso
-            initialTopMostItemIndex={999}
-            data={filterLogs}
-            itemContent={(index, item) => <LogItem value={item} />}
-            followOutput={"smooth"}
-          />
+          {filterLogs.length > 0 ? (
+            <Virtuoso
+              initialTopMostItemIndex={999}
+              data={filterLogs}
+              itemContent={(index, item) => <LogItem value={item} />}
+              followOutput={"smooth"}
+            />
+          ) : (
+            <BaseEmpty text="No Logs" />
+          )}
         </Box>
       </Paper>
     </BasePage>

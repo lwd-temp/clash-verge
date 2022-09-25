@@ -1,6 +1,7 @@
 use super::Core;
-use crate::log_if_err;
-use anyhow::{bail, Context, Result};
+use crate::utils::help::get_now;
+use crate::{data::Data, log_if_err};
+use anyhow::{Context, Result};
 use delay_timer::prelude::{DelayTimer, DelayTimerBuilder, TaskBuilder};
 use std::collections::HashMap;
 
@@ -15,9 +16,6 @@ pub struct Timer {
 
   /// increment id
   timer_count: TaskID,
-
-  /// save the instance of the app
-  core: Option<Core>,
 }
 
 impl Timer {
@@ -26,20 +24,11 @@ impl Timer {
       delay_timer: DelayTimerBuilder::default().build(),
       timer_map: HashMap::new(),
       timer_count: 1,
-      core: None,
     }
-  }
-
-  pub fn set_core(&mut self, core: Core) {
-    self.core = Some(core);
   }
 
   /// Correctly update all cron tasks
   pub fn refresh(&mut self) -> Result<()> {
-    if self.core.is_none() {
-      bail!("unhandle error for core is none");
-    }
-
     let diff_map = self.gen_diff();
 
     for (uid, diff) in diff_map.into_iter() {
@@ -63,9 +52,40 @@ impl Timer {
     Ok(())
   }
 
+  /// restore timer
+  pub fn restore(&mut self) -> Result<()> {
+    self.refresh()?;
+
+    let cur_timestamp = get_now(); // seconds
+
+    let global = Data::global();
+    let profiles = global.profiles.lock();
+
+    profiles
+      .get_items()
+      .unwrap_or(&vec![])
+      .iter()
+      .filter(|item| item.uid.is_some() && item.updated.is_some() && item.option.is_some())
+      .filter(|item| {
+        // mins to seconds
+        let interval = item.option.as_ref().unwrap().update_interval.unwrap_or(0) as usize * 60;
+        let updated = item.updated.unwrap();
+        return interval > 0 && cur_timestamp - updated >= interval;
+      })
+      .for_each(|item| {
+        let uid = item.uid.as_ref().unwrap();
+        if let Some((task_id, _)) = self.timer_map.get(uid) {
+          log_if_err!(self.delay_timer.advance_task(*task_id));
+        }
+      });
+
+    Ok(())
+  }
+
   /// generate a uid -> update_interval map
   fn gen_map(&self) -> HashMap<String, u64> {
-    let profiles = self.core.as_ref().unwrap().profiles.lock();
+    let global = Data::global();
+    let profiles = global.profiles.lock();
 
     let mut new_map = HashMap::new();
 
@@ -119,14 +139,14 @@ impl Timer {
 
   /// add a cron task
   fn add_task(&self, uid: String, tid: TaskID, minutes: u64) -> Result<()> {
-    let core = self.core.clone().unwrap();
+    let core = Core::global();
 
     let task = TaskBuilder::default()
       .set_task_id(tid)
       .set_maximum_parallel_runnable_num(1)
       .set_frequency_repeated_by_minutes(minutes)
       // .set_frequency_repeated_by_seconds(minutes) // for test
-      .spawn_async_routine(move || Self::async_task(core.clone(), uid.clone()))
+      .spawn_async_routine(move || Self::async_task(core.to_owned(), uid.to_owned()))
       .context("failed to create timer task")?;
 
     self

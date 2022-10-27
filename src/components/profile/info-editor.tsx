@@ -8,11 +8,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
+  Switch,
   TextField,
 } from "@mui/material";
 import { Settings } from "@mui/icons-material";
 import { patchProfile } from "@/services/cmds";
+import { version } from "@root/package.json";
 import Notice from "../base/base-notice";
 
 interface Props {
@@ -33,11 +36,15 @@ const InfoEditor = (props: Props) => {
 
   useEffect(() => {
     if (itemData) {
+      const { option } = itemData;
       setForm({ ...itemData });
-      setOption(itemData.option ?? {});
+      setOption(option ?? {});
       setShowOpt(
         itemData.type === "remote" &&
-          (!!itemData.option?.user_agent || !!itemData.option?.update_interval)
+          (!!option?.user_agent ||
+            !!option?.update_interval ||
+            !!option?.self_proxy ||
+            !!option?.with_proxy)
       );
     }
   }, [itemData]);
@@ -119,7 +126,7 @@ const InfoEditor = (props: Props) => {
             {...textFieldProps}
             label="User Agent"
             value={option.user_agent}
-            placeholder="clash-verge/v1.0.0"
+            placeholder={`clash-verge/v${version}`}
             onChange={(e) => setOption({ user_agent: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && onUpdate()}
           />
@@ -135,6 +142,46 @@ const InfoEditor = (props: Props) => {
               setOption({ update_interval: !!str ? +str : undefined });
             }}
             onKeyDown={(e) => e.key === "Enter" && onUpdate()}
+          />
+        )}
+
+        {form.type === "remote" && showOpt && (
+          <FormControlLabel
+            label={t("Use System Proxy")}
+            labelPlacement="start"
+            sx={{ ml: 0, my: 1 }}
+            control={
+              <Switch
+                color="primary"
+                checked={option.with_proxy ?? false}
+                onChange={(_e, c) =>
+                  setOption((o) => ({
+                    self_proxy: c ? false : o.self_proxy ?? false,
+                    with_proxy: c,
+                  }))
+                }
+              />
+            }
+          />
+        )}
+
+        {form.type === "remote" && showOpt && (
+          <FormControlLabel
+            label={t("Use Clash Proxy")}
+            labelPlacement="start"
+            sx={{ ml: 0, my: 1 }}
+            control={
+              <Switch
+                color="primary"
+                checked={option.self_proxy ?? false}
+                onChange={(_e, c) =>
+                  setOption((o) => ({
+                    with_proxy: c ? false : o.with_proxy ?? false,
+                    self_proxy: c,
+                  }))
+                }
+              />
+            }
           />
         )}
       </DialogContent>

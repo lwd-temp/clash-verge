@@ -22,6 +22,9 @@ pub struct Service {
   sidecar: Option<CommandChild>,
 
   logs: Arc<RwLock<VecDeque<String>>>,
+
+  #[allow(unused)]
+  use_service_mode: bool,
 }
 
 impl Service {
@@ -31,6 +34,7 @@ impl Service {
     Service {
       sidecar: None,
       logs: Arc::new(RwLock::new(queue)),
+      use_service_mode: false,
     }
   }
 
@@ -45,6 +49,8 @@ impl Service {
         let verge = data.verge.lock();
         verge.enable_service_mode.clone().unwrap_or(false)
       };
+
+      self.use_service_mode = enable;
 
       if !enable {
         return self.start_clash_by_sidecar();
@@ -74,14 +80,8 @@ impl Service {
     {
       let _ = self.stop_clash_by_sidecar();
 
-      let enable = {
-        let data = Data::global();
-        let verge = data.verge.lock();
-        verge.enable_service_mode.clone().unwrap_or(false)
-      };
-
-      if enable {
-        tauri::async_runtime::spawn(async move {
+      if self.use_service_mode {
+        tauri::async_runtime::block_on(async move {
           log_if_err!(Self::stop_clash_by_service().await);
         });
       }
@@ -129,8 +129,15 @@ impl Service {
     let app_dir = dirs::app_home_dir();
     let app_dir = app_dir.as_os_str().to_str().unwrap();
 
+    // fix #212
+    let args = match clash_core.as_str() {
+      "clash-meta" => vec!["-m", "-d", app_dir],
+      _ => vec!["-d", app_dir],
+    };
+
     let cmd = Command::new_sidecar(clash_core)?;
-    let (mut rx, cmd_child) = cmd.args(["-d", app_dir]).spawn()?;
+
+    let (mut rx, cmd_child) = cmd.args(args).spawn()?;
 
     // 将pid写入文件中
     let pid = cmd_child.pid();
@@ -165,6 +172,8 @@ impl Service {
             log::error!(target: "app" ,"[clash error]: {}", err);
             write_log(err);
           }
+          CommandEvent::Error(err) => log::error!(target: "app" ,"{err}"),
+          CommandEvent::Terminated(_) => break,
           _ => {}
         }
       }
@@ -212,8 +221,17 @@ impl Service {
     let mut data = HashMap::new();
     data.insert("path", temp_path.as_os_str().to_str().unwrap());
 
+    macro_rules! report_err {
+      ($i: expr, $e: expr) => {
+        match $i {
+          4 => bail!($e),
+          _ => log::error!(target: "app", $e),
+        }
+      };
+    }
+
     // retry 5 times
-    for _ in 0..5 {
+    for i in 0..5 {
       let headers = headers.clone();
       match reqwest::ClientBuilder::new().no_proxy().build() {
         Ok(client) => {
@@ -223,14 +241,12 @@ impl Service {
               204 => break,
               // 配置有问题不重试
               400 => bail!("failed to update clash config with status 400"),
-              status @ _ => {
-                log::error!(target: "app", "failed to activate clash with status \"{status}\"");
-              }
+              status @ _ => report_err!(i, "failed to activate clash with status \"{status}\""),
             },
-            Err(err) => log::error!(target: "app", "{err}"),
+            Err(err) => report_err!(i, "{err}"),
           }
         }
-        Err(err) => log::error!(target: "app", "{err}"),
+        Err(err) => report_err!(i, "{err}"),
       }
       sleep(Duration::from_millis(500)).await;
     }

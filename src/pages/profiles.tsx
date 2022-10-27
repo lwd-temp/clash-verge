@@ -133,7 +133,7 @@ const ProfilePage = () => {
       setCurrentProfile(uid);
       mutate("getProfiles", { ...profiles, current: uid }, true);
       mutate("getRuntimeLogs");
-      if (force) Notice.success("Refresh clash config", 1000);
+      // if (force) Notice.success("Refresh clash config", 1000);
     } catch (err: any) {
       Notice.error(err?.message || err.toString());
     }
@@ -149,6 +149,7 @@ const ProfilePage = () => {
           value={url}
           variant="outlined"
           autoComplete="off"
+          spellCheck="false"
           onChange={(e) => setUrl(e.target.value)}
           sx={{ input: { py: 0.65, px: 1.25 } }}
           placeholder={t("Profile URL")}

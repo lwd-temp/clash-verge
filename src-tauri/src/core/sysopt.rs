@@ -68,7 +68,7 @@ impl Sysopt {
       self.cur_sysproxy.as_ref().unwrap().set_system_proxy()?;
     }
 
-    // launchs the system proxy guard
+    // run the system proxy guard
     self.guard_proxy();
     Ok(())
   }
@@ -99,29 +99,28 @@ impl Sysopt {
 
   /// reset the sysproxy
   pub fn reset_sysproxy(&mut self) -> Result<()> {
-    if self.cur_sysproxy.is_none() {
-      return Ok(());
-    }
+    let cur = self.cur_sysproxy.take();
 
-    let mut cur = self.cur_sysproxy.take().unwrap();
+    if let Some(mut old) = self.old_sysproxy.take() {
+      // 如果原代理和当前代理 端口一致，就disable关闭，否则就恢复原代理设置
+      // 当前没有设置代理的时候，不确定旧设置是否和当前一致，全关了
+      let port_same = cur.map_or(true, |cur| old.port == cur.port);
 
-    match self.old_sysproxy.take() {
-      Some(old) => {
-        // 如果原代理设置和当前的设置是一样的，需要关闭
-        // 否则就恢复原代理设置
-        if old.enable && old.host == cur.host && old.port == cur.port {
-          cur.enable = false;
-          cur.set_system_proxy()?;
-        } else {
-          old.set_system_proxy()?;
-        }
+      if old.enable && port_same {
+        old.enable = false;
+        log::info!(target: "app", "reset proxy by disabling the original proxy");
+      } else {
+        log::info!(target: "app", "reset proxy to the original proxy");
       }
-      None => {
-        if cur.enable {
-          cur.enable = false;
-          cur.set_system_proxy()?;
-        }
-      }
+
+      old.set_system_proxy()?;
+    } else if let Some(mut cur @ Sysproxy { enable: true, .. }) = cur {
+      // 没有原代理，就按现在的代理设置disable即可
+      log::info!(target: "app", "reset proxy by disabling the current proxy");
+      cur.enable = false;
+      cur.set_system_proxy()?;
+    } else {
+      log::info!(target: "app", "reset proxy with no action");
     }
 
     Ok(())
@@ -170,6 +169,12 @@ impl Sysopt {
 
     self.auto_launch = Some(auto);
 
+    // 避免在开发时将自启动关了
+    #[cfg(feature = "verge-dev")]
+    if !enable {
+      return Ok(());
+    }
+
     let auto = self.auto_launch.as_ref().unwrap();
 
     // macos每次启动都更新登录项，避免重复设置登录项
@@ -206,7 +211,7 @@ impl Sysopt {
 
     match enable {
       true => auto_launch.enable()?,
-      false => auto_launch.disable()?,
+      false => crate::log_if_err!(auto_launch.disable()), // 忽略关闭的错误
     };
 
     Ok(())

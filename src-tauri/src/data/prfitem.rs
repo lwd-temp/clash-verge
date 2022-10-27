@@ -1,8 +1,10 @@
 use crate::utils::{config, dirs, help, tmpl};
 use anyhow::{bail, Context, Result};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
 use std::fs;
+use sysproxy::Sysproxy;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PrfItem {
@@ -69,8 +71,14 @@ pub struct PrfOption {
   pub user_agent: Option<String>,
 
   /// for `remote` profile
+  /// use system proxy
   #[serde(skip_serializing_if = "Option::is_none")]
   pub with_proxy: Option<bool>,
+
+  /// for `remote` profile
+  /// use self proxy
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub self_proxy: Option<bool>,
 
   #[serde(skip_serializing_if = "Option::is_none")]
   pub update_interval: Option<u64>,
@@ -78,30 +86,16 @@ pub struct PrfOption {
 
 impl PrfOption {
   pub fn merge(one: Option<Self>, other: Option<Self>) -> Option<Self> {
-    if one.is_none() {
-      return other;
+    match (one, other) {
+      (Some(mut a), Some(b)) => {
+        a.user_agent = b.user_agent.or(a.user_agent);
+        a.with_proxy = b.with_proxy.or(a.with_proxy);
+        a.self_proxy = b.self_proxy.or(a.self_proxy);
+        a.update_interval = b.update_interval.or(a.update_interval);
+        Some(a)
+      }
+      t @ _ => t.0.or(t.1),
     }
-
-    if one.is_some() && other.is_some() {
-      let mut one = one.unwrap();
-      let other = other.unwrap();
-
-      if let Some(val) = other.user_agent {
-        one.user_agent = Some(val);
-      }
-
-      if let Some(val) = other.with_proxy {
-        one.with_proxy = Some(val);
-      }
-
-      if let Some(val) = other.update_interval {
-        one.update_interval = Some(val);
-      }
-
-      return Some(one);
-    }
-
-    return one;
   }
 }
 
@@ -189,27 +183,64 @@ impl PrfItem {
     desc: Option<String>,
     option: Option<PrfOption>,
   ) -> Result<PrfItem> {
-    let with_proxy = match option.as_ref() {
-      Some(opt) => opt.with_proxy.unwrap_or(false),
-      None => false,
-    };
-    let user_agent = match option.as_ref() {
-      Some(opt) => opt.user_agent.clone(),
-      None => None,
-    };
+    let opt_ref = option.as_ref();
+    let with_proxy = opt_ref.map_or(false, |o| o.with_proxy.unwrap_or(false));
+    let self_proxy = opt_ref.map_or(false, |o| o.self_proxy.unwrap_or(false));
+    let user_agent = opt_ref.map_or(None, |o| o.user_agent.clone());
 
-    let mut builder = reqwest::ClientBuilder::new();
+    let mut builder = reqwest::ClientBuilder::new().no_proxy();
 
-    if !with_proxy {
-      builder = builder.no_proxy();
+    // 使用软件自己的代理
+    if self_proxy {
+      let data = super::Data::global();
+      let port = data.clash.lock().info.port.clone();
+      let port = port.ok_or(anyhow::anyhow!("failed to get clash info port"))?;
+      let proxy_scheme = format!("http://127.0.0.1:{port}");
+
+      if let Ok(proxy) = reqwest::Proxy::http(&proxy_scheme) {
+        builder = builder.proxy(proxy);
+      }
+      if let Ok(proxy) = reqwest::Proxy::https(&proxy_scheme) {
+        builder = builder.proxy(proxy);
+      }
+      if let Ok(proxy) = reqwest::Proxy::all(&proxy_scheme) {
+        builder = builder.proxy(proxy);
+      }
+    }
+    // 使用系统代理
+    else if with_proxy {
+      match Sysproxy::get_system_proxy() {
+        Ok(p @ Sysproxy { enable: true, .. }) => {
+          let proxy_scheme = format!("http://{}:{}", p.host, p.port);
+
+          if let Ok(proxy) = reqwest::Proxy::http(&proxy_scheme) {
+            builder = builder.proxy(proxy);
+          }
+          if let Ok(proxy) = reqwest::Proxy::https(&proxy_scheme) {
+            builder = builder.proxy(proxy);
+          }
+          if let Ok(proxy) = reqwest::Proxy::all(&proxy_scheme) {
+            builder = builder.proxy(proxy);
+          }
+        }
+        _ => {}
+      };
     }
 
-    builder = builder.user_agent(user_agent.unwrap_or("clash-verge/v1.0.0".into()));
+    let version = unsafe { dirs::APP_VERSION };
+    let version = format!("clash-verge/{version}");
+    builder = builder.user_agent(user_agent.unwrap_or(version));
 
     let resp = builder.build()?.get(url).send().await?;
+
+    let status_code = resp.status();
+    if !StatusCode::is_success(&status_code) {
+      bail!("failed to fetch remote profile with status {status_code}")
+    }
+
     let header = resp.headers();
 
-    // parse the Subscription Userinfo
+    // parse the Subscription UserInfo
     let extra = match header.get("Subscription-Userinfo") {
       Some(value) => {
         let sub_info = value.to_str().unwrap_or("");

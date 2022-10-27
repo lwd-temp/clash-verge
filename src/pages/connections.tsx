@@ -44,12 +44,12 @@ const ConnectionsPage = () => {
 
   const filterConn = useMemo(() => {
     const orderFunc = orderOpts[curOrderOpt];
-    const connetions = connData.connections.filter((conn) =>
+    const connections = connData.connections.filter((conn) =>
       (conn.metadata.host || conn.metadata.destinationIP)?.includes(filterText)
     );
 
-    if (orderFunc) return orderFunc(connetions);
-    return connetions;
+    if (orderFunc) return orderFunc(connections);
+    return connections;
   }, [connData, filterText, curOrderOpt]);
 
   useEffect(() => {
@@ -108,6 +108,7 @@ const ConnectionsPage = () => {
       header={
         <Box sx={{ mt: 1, display: "flex", alignItems: "center" }}>
           <IconButton
+            color="inherit"
             size="small"
             sx={{ mr: 2 }}
             onClick={() =>
@@ -167,6 +168,7 @@ const ConnectionsPage = () => {
             fullWidth
             size="small"
             autoComplete="off"
+            spellCheck="false"
             variant="outlined"
             placeholder={t("Filter conditions")}
             value={filterText}
